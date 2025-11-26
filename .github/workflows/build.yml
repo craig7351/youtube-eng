@@ -1,0 +1,61 @@
+name: 建置 Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*'  # 當推送版本標籤時觸發（例如 v1.0.0）
+  workflow_dispatch:  # 允許手動觸發
+  release:
+    types: [published]  # 當發布新版本時觸發
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: 檢出程式碼
+      uses: actions/checkout@v4
+      
+    - name: 設定 Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        
+    - name: 安裝依賴
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: 清除舊的建置檔案
+      run: |
+        if (Test-Path build) { Remove-Item -Recurse -Force build }
+        if (Test-Path dist) { Remove-Item -Recurse -Force dist }
+        if (Test-Path english_learning.spec) { Remove-Item -Force english_learning.spec }
+        
+    - name: 使用 PyInstaller 打包
+      run: |
+        python -m PyInstaller --noconfirm --onefile --name english_learning --add-data "templates;templates" --add-data "static;static" run.py
+        
+    - name: 複製 JSON 資料檔
+      run: |
+        if (Test-Path word_banks.json) { Copy-Item word_banks.json dist\ }
+        if (Test-Path user_data.json) { Copy-Item user_data.json dist\ }
+        if (Test-Path bookmarks.json) { Copy-Item bookmarks.json dist\ }
+        if (Test-Path subtitle_cache.json) { Copy-Item subtitle_cache.json dist\ }
+        if (Test-Path translation_cache.json) { Copy-Item translation_cache.json dist\ }
+        
+    - name: 上傳建置產物
+      uses: actions/upload-artifact@v4
+      with:
+        name: english-learning-exe
+        path: dist/english_learning.exe
+        retention-days: 30
+        
+    - name: 上傳所有 dist 檔案（包含 JSON）
+      uses: actions/upload-artifact@v4
+      with:
+        name: english-learning-dist
+        path: dist/*
+        retention-days: 30
+
